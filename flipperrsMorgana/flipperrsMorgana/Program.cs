@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using EloBuddy;
@@ -24,7 +24,7 @@ namespace flipperrsMorgana
         private static Spell.Targeted E;
         private static Spell.Active R;
         private static AIHeroClient User = Player.Instance;
-        private static Menu MorganaMenu, ComboMenu, DrawingsMenu, SpellsToShield, BlackShieldAllies, AutoMenu, HarassMenu, QConfig, LaneClearMenu;
+        private static Menu MorganaMenu, ComboMenu, DrawingsMenu, SpellsToShield, BlackShieldAllies, AutoMenu, HarassMenu, QConfig, LaneClearMenu, WConfig;
         private static List<Spell.SpellBase> SpellList = new List<Spell.SpellBase>();
         public static List<MissileClient> ProjectileList = new List<MissileClient>();
         public static List<SpellInfo> EnemyProjectileInformation = new List<SpellInfo>();
@@ -42,7 +42,7 @@ namespace flipperrsMorgana
 
         private static void Loading_OnLoadingComplete(EventArgs args)
         {
-            Chat.Print("<font color='#07667F'>Flipper's Morgana Loaded Successfully</font> ");
+            Chat.Print("<font color='#07667F'>Flipper's Morgana 1.1 Loaded Successfully</font> ");
             Chat.Print("<font color='#E11610'>Please Report Any Issues in the Thread.</font> ");
 
 
@@ -71,6 +71,7 @@ namespace flipperrsMorgana
 
             MorganaMenu = MainMenu.AddMenu("Morgana", "Morgana");
             QConfig = MorganaMenu.AddSubMenu("QConfig");
+            WConfig = MorganaMenu.AddSubMenu("WConfig");
             ComboMenu = MorganaMenu.AddSubMenu("ComboMenu");
             HarassMenu = MorganaMenu.AddSubMenu("HarassMenu");
             LaneClearMenu = MorganaMenu.AddSubMenu("LaneClearMenu");
@@ -86,8 +87,10 @@ namespace flipperrsMorgana
             ComboMenu.Add("W", new CheckBox("Use W"));
             ComboMenu.Add("E", new CheckBox("Use E"));
             ComboMenu.Add("R", new CheckBox("Use R"));
+            ComboMenu.Add("SpamW", new CheckBox("Spam W even if target can move?"));
             HarassMenu.Add("Q", new CheckBox("Use Q"));
             HarassMenu.Add("W", new CheckBox("Use W"));
+            HarassMenu.Add("SpamW", new CheckBox("Spam W even if target can move?"));
             LaneClearMenu.Add("W", new CheckBox("Use W on minions"));
             AutoMenu.Add("Rcount", new Slider("Use R If Hit Enemy ", 3, 1, 5));
             LaneClearMenu.Add("minionCount", new Slider("Use W if hit minions ", 3, 1, 5));
@@ -100,6 +103,7 @@ namespace flipperrsMorgana
             foreach (AIHeroClient client in EntityManager.Heroes.Enemies)
             {
                 QConfig.Add(client.ChampionName, new CheckBox("Q Enabled on" + client.ChampionName));
+                WConfig.Add(client.ChampionName, new CheckBox("W Enabled on" + client.ChampionName));
                 foreach (SpellInfo info in SpellDatabase.SpellList)
                 {
                     if (info.ChampionName == client.ChampionName)
@@ -150,7 +154,14 @@ namespace flipperrsMorgana
 
         private static void GameOnUpdate(EventArgs args)
         {
+            if (User.Position.CountEnemiesInRange(R.Range) >= AutoMenu["Rcount"].Cast<Slider>().CurrentValue)
+            {
+                R.Cast();
+
+            }
+
             TryToE();
+
             //   EAllies();
         }
 
@@ -213,17 +224,18 @@ namespace flipperrsMorgana
                 Q.Cast(t);
             }
 
-            if ((ComboMenu["W"].Cast<CheckBox>().CurrentValue && t.IsValidTarget(W.Range) && W.IsReady() && t.HasBuffOfType(BuffType.Snare) || t.HasBuffOfType(BuffType.Stun)))
+            if ((ComboMenu["W"].Cast<CheckBox>().CurrentValue && t.IsValidTarget(W.Range) && W.IsReady() && WConfig[t.ChampionName].Cast<CheckBox>().CurrentValue && ComboMenu["SpamW"].Cast<CheckBox>().CurrentValue))
+            {
+                W.Cast(t);
+            }
+
+            if ((ComboMenu["W"].Cast<CheckBox>().CurrentValue && t.IsValidTarget(W.Range) && W.IsReady() && WConfig[t.ChampionName].Cast<CheckBox>().CurrentValue && ComboMenu["SpamW"].Cast<CheckBox>().CurrentValue == false && t.HasBuffOfType(BuffType.Snare) || t.HasBuffOfType(BuffType.Stun)))
             {
                 W.Cast(t);
             }
 
 
-            if (User.Position.CountEnemiesInRange(R.Range) >= AutoMenu["Rcount"].Cast<Slider>().CurrentValue)
-            {
-                R.Cast();
-
-            }
+       
 
         }
 
@@ -250,7 +262,12 @@ namespace flipperrsMorgana
                 Q.Cast(t);
             }
 
-            if (t.IsValidTarget(W.Range) && W.IsReady() && t.HasBuffOfType(BuffType.Snare) || t.HasBuffOfType(BuffType.Stun))
+            if (t.IsValidTarget(W.Range) && W.IsReady() && HarassMenu["SpamW"].Cast<CheckBox>().CurrentValue && WConfig[t.ChampionName].Cast<CheckBox>().CurrentValue && pred.HitChance >= HitChance.Medium)
+            {
+                W.Cast(t);
+            }
+
+            if (t.IsValidTarget(W.Range) && W.IsReady() && HarassMenu["SpamW"].Cast<CheckBox>().CurrentValue == false && t.IsRooted || t.IsStunned && WConfig[t.ChampionName].Cast<CheckBox>().CurrentValue)
             {
                 W.Cast(t);
             }
@@ -284,7 +301,7 @@ namespace flipperrsMorgana
         }
 
         private static void TryToE()
-            //credit to Chaos for this logic if about to be hit!
+        //credit to Chaos for this logic if about to be hit!
         {
             if (E.IsReady() && E.IsLearned)
                 foreach (MissileClient missile in ProjectileList)
@@ -311,7 +328,7 @@ namespace flipperrsMorgana
 
         public static bool ShouldShield(MissileClient missile, SpellInfo info, AIHeroClient client)
         {
-     
+
 
             if (missile.SpellCaster.Name != "Diana")
                 if (missile.SData.Name != info.MissileName ||
@@ -329,7 +346,7 @@ namespace flipperrsMorgana
         }
 
 
-      
+
         public static bool CollisionCheck(MissileClient missile, SpellInfo info, AIHeroClient client)
         {
             bool variable = Prediction.Position.Collision.LinearMissileCollision(
